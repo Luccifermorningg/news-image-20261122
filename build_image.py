@@ -1,93 +1,192 @@
 #!/usr/bin/env python3
-"""Build the 1024x1024 news-summary image for make.fun bounty news-image-20261122.
-Flat vector style, dark navy + warm orange, all text drawn with PIL for legibility.
-Output: news.png (1024x1024, must be <= 1 MiB).
+"""Draw the 22 November 2026 world-news summary image (1024x1024).
+
+Dark navy canvas with warm orange accents. Four stories, a headline
+kicker, and a bottom ticker strip with a small ascending candlestick
+chart and the day's Bitcoin price. Pure Pillow, no network, no clock
+reads: the same input always produces the same PNG bytes.
 """
-import textwrap
+
+import os
+
 from PIL import Image, ImageDraw, ImageFont
 
-W, H = 1024, 1024
-NAVY = (14, 26, 43)
-NAVY2 = (20, 38, 62)
-ORANGE = (249, 115, 22)
-ORANGE_L = (255, 150, 60)
+WIDTH, HEIGHT = 1024, 1024
+
+NAVY = (27, 42, 74)        # #1B2A4A
+NAVY_DARK = (15, 29, 51)   # darker strip at the bottom
+ORANGE = (232, 98, 44)     # #E8622C
 WHITE = (255, 255, 255)
-GRAY = (196, 205, 216)
-RED = (239, 68, 68)
-RED_D = (185, 28, 28)
-GREEN = (34, 197, 94)
-GREEN_D = (22, 163, 74)
+SOFT = (205, 214, 228)     # body text, slightly softened white
+GREEN = (46, 204, 113)     # candles and the positive change
 
-FDIR = "/usr/share/fonts/truetype/dejavu/"
-def font(name, size):
-    return ImageFont.truetype(FDIR + name, size)
+FONT_DIR = "/usr/share/fonts/truetype/dejavu"
+BOLD = os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
+REGULAR = os.path.join(FONT_DIR, "DejaVuSans.ttf")
 
-f_kicker = font("DejaVuSans-Bold.ttf", 30)
-f_title = font("DejaVuSans-Bold.ttf", 72)
-f_sub = font("DejaVuSans-Bold.ttf", 30)
-f_head = font("DejaVuSans-Bold.ttf", 37)
-f_body = font("DejaVuSans.ttf", 27)
-f_small = font("DejaVuSans.ttf", 23)
-f_num = font("DejaVuSans-Bold.ttf", 44)
+KICKER = "SUNDAY \u2022 22 NOVEMBER 2026"
+TITLE = "THE WORLD IN ONE DAY"
 
-img = Image.new("RGB", (W, H), NAVY)
-d = ImageDraw.Draw(img)
-
-# Top orange bar
-d.rectangle([0, 0, W, 10], fill=ORANGE)
-
-# Kicker
-d.text((48, 36), "SUNDAY  •  22 NOVEMBER 2026", font=f_kicker, fill=ORANGE_L)
-# Title
-d.text((48, 78), "THE WORLD", font=f_title, fill=WHITE)
-d.text((48, 152), "IN ONE DAY", font=f_title, fill=ORANGE)
-# Divider
-d.rectangle([48, 248, 976, 252], fill=(60, 80, 110))
-
-stories = [
-    ("01", "COP31 COLLAPSES",
-     "Two weeks of talks in Antalya end with no deal — the first climate summit failure since 2000."),
-    ("02", "IRAN STRIKES BAHRAIN",
-     "Missiles and drones hit US bases; a civilian plant is struck and burns. Bahrain says no one was hurt."),
-    ("03", "'EL CHAPO ISIDRO' CAUGHT",
-     "Mexican special forces capture the FBI most-wanted cartel boss in Sinaloa, with US intelligence help."),
-    ("04", "BITCOIN BOUNCES BACK",
-     "Bitcoin climbs back above $60,000 after Saturday's $55,130 low, the lowest since September 2024."),
+STORIES = [
+    (
+        "COP31 COLLAPSES",
+        "Two weeks of climate talks in Antalya ended with no deal; "
+        "the final text never mentioned fossil fuels. First "
+        "climate-summit failure since COP6 (2000).",
+    ),
+    (
+        "IRAN STRIKES BAHRAIN",
+        "IRGC missile-and-drone strikes on US positions at the "
+        "Al-Riffa and Awali bases on Saturday evening; a civilian "
+        "industrial facility was hit and burned. Bahrain says no "
+        "one was hurt.",
+    ),
+    (
+        "'EL CHAPO ISIDRO' CAUGHT",
+        "Mexican special forces captured FBI Ten Most Wanted cartel "
+        "boss Fausto Isidro Meza Flores in Guasave, Sinaloa on "
+        "20 Nov, with US intelligence help; $5M US reward.",
+    ),
+    (
+        "BITCOIN BOUNCES BACK",
+        "BTC back above $60,000 after Saturday's $55,130 low.",
+    ),
 ]
 
-y = 282
-for num, head, body in stories:
-    # number badge
-    d.rounded_rectangle([48, y, 108, y + 60], radius=8, fill=ORANGE)
-    tw = d.textlength(num, font=f_num)
-    d.text((48 + (60 - tw) / 2, y + 6), num, font=f_num, fill=NAVY)
-    # headline
-    d.text((132, y + 2), head, font=f_head, fill=WHITE)
-    # body wrapped
-    lines = textwrap.wrap(body, width=52)
-    by = y + 52
-    for ln in lines:
-        d.text((132, by), ln, font=f_body, fill=GRAY)
-        by += 34
-    y = by + 26
-    if num != "04":
-        d.line([48, y - 12, 976, y - 12], fill=(40, 58, 84), width=2)
+TICKER_TEXT = "BTC $60,712 / "
+TICKER_CHANGE = "+0.7% today"
 
-# Bottom strip: mini candlestick chart (green, ascending — the rebound) + ticker
-chart_x0, chart_y0, chart_w, chart_h = 48, 868, 560, 110
-d.rounded_rectangle([36, 856, 636, 990], radius=10, fill=NAVY2)
-candles = [(0.88, 0.80), (0.78, 0.70), (0.68, 0.60), (0.58, 0.48), (0.46, 0.36), (0.34, 0.24), (0.22, 0.10)]
-cw = chart_w // len(candles)
-for i, (lo_frac, hi_frac) in enumerate(candles):
-    cx = chart_x0 + i * cw + cw // 2
-    y_hi = chart_y0 + int(hi_frac * chart_h)
-    y_lo = chart_y0 + int(lo_frac * chart_h)
-    d.line([cx, y_hi - 8, cx, y_lo + 8], fill=GREEN, width=3)
-    d.rectangle([cx - 16, y_hi, cx + 16, y_lo], fill=GREEN_D if i % 2 else GREEN)
-d.text((660, 872), "BTC  $60,712", font=f_head, fill=WHITE)
-d.text((660, 920), "+0.7% today", font=f_head, fill=GREEN)
-d.text((48, 1000 - 14), "", font=f_small, fill=GRAY)
+MARGIN = 56
+CONTENT_WIDTH = WIDTH - 2 * MARGIN
 
-img.save("/home/hatch/workspace/makefun-news-image-20261122/news.png", "PNG", optimize=True)
-import os
-print("saved", os.path.getsize("/home/hatch/workspace/makefun-news-image-20261122/news.png"), "bytes")
+
+def font(path, size):
+    return ImageFont.truetype(path, size)
+
+
+def wrap(draw, text, face, max_width):
+    """Split text into lines that fit max_width with the given font."""
+    words = text.split()
+    lines = []
+    current = ""
+    for word in words:
+        trial = word if not current else current + " " + word
+        if draw.textlength(trial, font=face) <= max_width:
+            current = trial
+        else:
+            if current:
+                lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines
+
+
+def draw_spaced(draw, x, y, text, face, fill, spacing=3):
+    """Draw text with extra space between letters (for the kicker)."""
+    cursor = x
+    for char in text:
+        draw.text((cursor, y), char, font=face, fill=fill)
+        cursor += draw.textlength(char, font=face) + spacing
+    return cursor
+
+
+def fit_font(draw, text, path, start_size, max_width):
+    """Largest font size (from start_size down) that fits max_width."""
+    size = start_size
+    face = font(path, size)
+    while size > 24 and draw.textlength(text, font=face) > max_width:
+        size -= 2
+        face = font(path, size)
+    return face
+
+
+def draw_candles(draw, x0, y_top, y_bottom, count=5):
+    """Small ascending green candlesticks inside the given box."""
+    box_w = 180
+    box_h = y_bottom - y_top
+    slot = box_w / count
+    body_w = 16
+    # Each candle sits higher than the last; wicks poke out a little.
+    for i in range(count):
+        frac = i / (count - 1)  # 0.0 at the left, 1.0 at the right
+        cx = x0 + slot * i + slot / 2
+        top = y_top + box_h * (0.62 - 0.50 * frac)
+        bottom = y_top + box_h * (0.88 - 0.50 * frac)
+        wick_top = top - 8
+        wick_bottom = bottom + 8
+        draw.line([(cx, wick_top), (cx, wick_bottom)], fill=GREEN, width=2)
+        draw.rectangle(
+            [cx - body_w / 2, top, cx + body_w / 2, bottom], fill=GREEN
+        )
+
+
+def build():
+    image = Image.new("RGB", (WIDTH, HEIGHT), NAVY)
+    draw = ImageDraw.Draw(image)
+
+    # --- header: kicker, rule, title, divider -------------------------
+    kicker_face = font(BOLD, 25)
+    draw_spaced(draw, MARGIN, 52, KICKER, kicker_face, ORANGE, spacing=3)
+    draw.rectangle([MARGIN, 100, MARGIN + 120, 104], fill=ORANGE)
+
+    title_face = fit_font(draw, TITLE, BOLD, 62, CONTENT_WIDTH)
+    draw.text((MARGIN, 122), TITLE, font=title_face, fill=WHITE)
+    bbox = draw.textbbox((MARGIN, 122), TITLE, font=title_face)
+    title_bottom = bbox[3] + 18
+    draw.rectangle(
+        [MARGIN, title_bottom, WIDTH - MARGIN, title_bottom + 2], fill=ORANGE
+    )
+
+    # --- stories -------------------------------------------------------
+    head_face = font(BOLD, 30)
+    body_face = font(REGULAR, 22)
+    head_h = 36
+    line_h = 32   # a touch more air between wrapped body lines
+    block_gap = 36  # fills the column down toward the ticker strip
+
+    wrapped = [wrap(draw, body, body_face, CONTENT_WIDTH) for _, body in STORIES]
+    total = sum(head_h + len(lines) * line_h for lines in wrapped)
+    total += block_gap * (len(STORIES) - 1)
+
+    strip_top = HEIGHT - 118
+    area_top = title_bottom + 22
+    area_bottom = strip_top - 28
+    start_y = area_top + max(0, (area_bottom - area_top - total) // 2)
+
+    y = start_y
+    for (headline, _), lines in zip(STORIES, wrapped):
+        draw.text((MARGIN, y), headline, font=head_face, fill=ORANGE)
+        y += head_h
+        for line in lines:
+            draw.text((MARGIN, y), line, font=body_face, fill=SOFT)
+            y += line_h
+        y += block_gap
+
+    # --- bottom ticker strip ------------------------------------------
+    draw.rectangle([0, strip_top, WIDTH, HEIGHT], fill=NAVY_DARK)
+    draw.rectangle([0, strip_top, WIDTH, strip_top + 3], fill=ORANGE)
+
+    chart_x = MARGIN + 8
+    chart_top = strip_top + 24
+    chart_bottom = HEIGHT - 26
+    draw_candles(draw, chart_x, chart_top, chart_bottom)
+
+    text_face = font(BOLD, 30)
+    text_x = chart_x + 180 + 28
+    text_y = strip_top + (HEIGHT - strip_top) // 2 - 15
+    draw.text((text_x, text_y), TICKER_TEXT, font=text_face, fill=WHITE)
+    after = text_x + draw.textlength(TICKER_TEXT, font=text_face)
+    draw.text((after, text_y), TICKER_CHANGE, font=text_face, fill=GREEN)
+
+    out_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "news.png"
+    )
+    image.save(out_path, format="PNG")
+    print("wrote {} ({}x{}, {} bytes)".format(
+        out_path, WIDTH, HEIGHT, os.path.getsize(out_path)
+    ))
+
+
+if __name__ == "__main__":
+    build()
